@@ -1,0 +1,13 @@
+name = "ZStackAnalysis"
+uuid = "2f725989-132c-40d3-b38d-add61892d7fb"
+authors = ["Joon-Hyuk Ko <jhko725@snu.ac.kr> and contributors"]
+version = "0.1.0"
+
+[compat]
+julia = "1.6"
+
+[extras]
+Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
+
+[targets]
+test = ["Test"]
