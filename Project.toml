@@ -3,6 +3,19 @@ uuid = "2f725989-132c-40d3-b38d-add61892d7fb"
 authors = ["Joon-Hyuk Ko <jhko725@snu.ac.kr> and contributors"]
 version = "0.1.0"
 
+[deps]
+FileIO = "5789e2e9-d7fb-5bc7-8068-2c6fae9b9549"
+GLMakie = "e9467ef8-e4e7-5192-8a1a-b1aee30e663a"
+ImageBinarization = "cbc4b850-ae4b-5111-9e64-df94c024a13d"
+ImageIO = "82e4d734-157c-48bb-816b-45c225c6df19"
+Images = "916415d5-f1e6-5110-898d-aaa5f9f070e0"
+Interpolations = "a98d9a8b-a2ab-59e6-89dd-64a1c18fca59"
+LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
+NPZ = "15e1cf62-19b3-5cfa-8e77-841668bca605"
+ProgressMeter = "92933f4c-e287-5a05-a399-4b506db050ca"
+QuadGK = "1fd47b50-473d-5c70-9696-f719f8f3bcdc"
+StaticArrays = "90137ffa-7385-5640-81b9-e52037218182"
+
 [compat]
 julia = "1.6"
 
