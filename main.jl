@@ -7,13 +7,16 @@ import NPZ: npzread
 using GLMakie
 using ZStackAnalysis
 ##
-file_content = npzread("./Fed_X63_Z2_SIM.npz")
+file_content = npzread("./data/Fed_X63_Z2_SIM.npz")
 #file_content = npzread("./SIM_Jing.npz")
 function convert_to_float32(zstack::AbstractArray)
     return Float32.(reinterpret(Images.N0f16, zstack))
 end
 zstack = convert_to_float32(file_content["data"])
 scale = file_content["scale"]
+# TODO: create a struct and/or use NamedArrays / AxisArrays to store channel names & relevant scale
+# Also make all the downstream functions dispatch on this struct
+
 ##
 size(zstack)
 ##
@@ -25,7 +28,21 @@ size(jing_reshaped)
 ##
 size(zstack)
 ##
-
+using Base.Threads
+function equalize_zstack(zstack)
+    output = similar(zstack)
+    equalizer = Images.Equalization(nbins = 256, minval = 0.0, maxval = 0.7)
+    @threads for I in CartesianIndices(axes(zstack)[1:2])
+        output[I, :, :] = Images.adjust_histogram(zstack[I, :, :], equalizer)
+    end
+    return output
+end
+##
+zstack_eq = equalize_zstack(zstack)
+##
+test = (1, 2, 3, 4)
+test[1:2]
+##
 image(jing_reshaped[:, :, 3, 20])
 ##
 jing_overlay = Float32.(mean(jing_reshaped, dims = 4)[1000:1500, 1000:1500, :, 1])
@@ -39,7 +56,7 @@ image(@view zstack[2, 1, :, :])
 vol = zstack[1, :, 1201:1500, 201:500]
 image(vol[1, :, :])
 ##
-
+axes(zstack, 1)
 
 ##
 xy_region = (1201:1500, 201:500)
@@ -61,14 +78,19 @@ volume(actin_adj, algorithm = :mip, colormap = :Greens_9, transparancy = true)
 volume(desmin_adj, algorithm = :mip, colormap = :Reds_9, transparancy = true)
 current_figure()
 ##
-size(actin_adj)
+##
+#figure = Figure()
+#axis3 = Axis3(figure[1, 1])
+volume(actin_adj, algorithm = :mip, colormap = :Greens_9, transparancy = true)
+volume(zstack_eq[2, :, xy_region...], algorithm = :mip, colormap = :Reds_9, transparancy = true)
+current_figure()
 ##
 
 vol_RGB = Images.colorview(Images.RGB, desmin_adj, actin_adj, Images.zeroarray)
 z_ind = 120
 image(vol_RGB[z_ind, :, :])
 ##
-using ZStackAnalysis
+
 ##
 actin_I, actin_θ = LineFilterTransform(actin_adj[z_ind, :, :], 10, 7, 20)
 desmin_I, desmin_θ = LineFilterTransform(desmin_adj[z_ind, :, :], 10, 7, 20)
@@ -139,11 +161,7 @@ fig
 ##
 actin3dI, actin3dθ = LineFilterTransform(actin_adj[1:100, 1:100, 1:100], 10, 5, 10)
 ##
-volume(Images.scaleminmax(0.0, maximum(actin3dI)).(actin3dI), algorithm = :mip, colormap = :Greens_9, transparancy = true)
-##
 desmin3dI, desmin3dθ = LineFilterTransform(desmin_adj[1:100, 1:100, 1:100], 10, 5, 10)
-##
-volume(Images.scaleminmax(Images.otsu_threshold(desmin3dI), maximum(desmin3dI)).(desmin3dI), algorithm = :mip, colormap = :Reds_9, transparancy = true)
 ##
 fig = Figure(resolution = (1000, 700))
 ax1 = fig[1, 1] = Axis3(fig, title = "Actin LFT intensity")

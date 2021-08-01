@@ -1,8 +1,11 @@
 module ZStackAnalysis
 
+include("./Preprocessing.jl")
 include("./Transforms.jl")
 using Interpolations
+using .Preprocessing
 using .Transforms
+
 
 function interpolate_zstack(zstack, scale)
     scale_x, scale_y, scale_z = scale/minimum(scale)
@@ -14,6 +17,7 @@ function interpolate_zstack(zstack, scale)
     return sitp(0:(nz-1)*scale_z, 0:(nx-1)*scale_x, 0:(ny-1)*scale_y)
 end
 
+export Preprocessing
 export interpolate_zstack
-export LineFilterTransform, OrientationFilterTransform
+export LineFilterTransform, OrientationFilterTransform, line_segment
 end
