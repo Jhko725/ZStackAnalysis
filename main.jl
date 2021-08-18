@@ -9,10 +9,8 @@ using ZStackAnalysis
 ##
 file_content = npzread("./data/Fed_X63_Z2_SIM.npz")
 #file_content = npzread("./SIM_Jing.npz")
-function convert_to_float32(zstack::AbstractArray)
-    return Float32.(reinterpret(Images.N0f16, zstack))
-end
-zstack = convert_to_float32(file_content["data"])
+
+zstack = file_content["data"] |> Preprocessing.convert_to_float32 |> Preprocessing.equalize_zstack
 scale = file_content["scale"]
 # TODO: create a struct and/or use NamedArrays / AxisArrays to store channel names & relevant scale
 # Also make all the downstream functions dispatch on this struct
@@ -20,29 +18,37 @@ scale = file_content["scale"]
 ##
 size(zstack)
 ##
+xy_region = (1201:1500, 201:500)
+actin = interpolate_zstack(zstack[1, :, xy_region...], scale)
+desmin = interpolate_zstack(zstack[2, :, xy_region...], scale)
+
+##
+volume(actin, algorithm = :mip, colormap = :Greens_9, transparancy = true)
+volume(desmin, algorithm = :mip, colormap = :Reds_9, transparancy = true)
+current_figure()
+##
+z_ind = 50
+actin_I, actin_θ = LineFilterTransform(actin[z_ind, :, :], 10, 7, 20)
+desmin_I, desmin_θ = LineFilterTransform(desmin[z_ind, :, :], 10, 7, 20)
+actin_oft = OrientationFilterTransform(actin_I, actin_θ, 10, 7, 20)
+desmin_oft = OrientationFilterTransform(desmin_I, desmin_θ, 10, 7, 20)
+##
+binarize(x) = x > zero(x) ? one(x) : zero(x)
+oft_mask = 
+
+##
 using FileIO
 jing = load("./Image 6_Out crop.tif")
-##
 jing_reshaped = reshape(jing, 2560, 2560, 4, 21)
 size(jing_reshaped)
 ##
+
+##
 size(zstack)
 ##
-using Base.Threads
-function equalize_zstack(zstack)
-    output = similar(zstack)
-    equalizer = Images.Equalization(nbins = 256, minval = 0.0, maxval = 0.7)
-    @threads for I in CartesianIndices(axes(zstack)[1:2])
-        output[I, :, :] = Images.adjust_histogram(zstack[I, :, :], equalizer)
-    end
-    return output
-end
+
 ##
-zstack_eq = equalize_zstack(zstack)
-##
-test = (1, 2, 3, 4)
-test[1:2]
-##
+
 image(jing_reshaped[:, :, 3, 20])
 ##
 jing_overlay = Float32.(mean(jing_reshaped, dims = 4)[1000:1500, 1000:1500, :, 1])
@@ -66,36 +72,10 @@ desmin = interpolate_zstack(zstack[2, :, xy_region...], scale)
 jing3D = interpolate_zstack(Float32.(jing_reshaped[1000:1500, 1000:1500, :, :]), [3.13e-8, 3.13e-8, 1.1e-7])
 size(jing3D)
 ##
-volume(actin, algorithm = :mip, colormap = :Greens_9, transparancy = true)
-#volume(desmin, algorithm = :mip, colormap = :Reds_9, transparancy = true)
-##
-actin_adj = Images.adjust_histogram(actin, Images.Equalization(nbins = 256, minval = 0.0, maxval = 0.7))
-desmin_adj = Images.adjust_histogram(desmin, Images.Equalization(nbins = 256, minval = 0.0, maxval = 0.7))
-##
-#figure = Figure()
-#axis3 = Axis3(figure[1, 1])
-volume(actin_adj, algorithm = :mip, colormap = :Greens_9, transparancy = true)
-volume(desmin_adj, algorithm = :mip, colormap = :Reds_9, transparancy = true)
-current_figure()
-##
-##
-#figure = Figure()
-#axis3 = Axis3(figure[1, 1])
-volume(actin_adj, algorithm = :mip, colormap = :Greens_9, transparancy = true)
-volume(zstack_eq[2, :, xy_region...], algorithm = :mip, colormap = :Reds_9, transparancy = true)
-current_figure()
-##
 
-vol_RGB = Images.colorview(Images.RGB, desmin_adj, actin_adj, Images.zeroarray)
-z_ind = 120
-image(vol_RGB[z_ind, :, :])
-##
 
 ##
-actin_I, actin_θ = LineFilterTransform(actin_adj[z_ind, :, :], 10, 7, 20)
-desmin_I, desmin_θ = LineFilterTransform(desmin_adj[z_ind, :, :], 10, 7, 20)
-actin_oft = OrientationFilterTransform(actin_I, actin_θ, 10, 7, 20)
-desmin_oft = OrientationFilterTransform(desmin_I, desmin_θ, 10, 7, 20)
+
 ##
 jing_I, jing_θ = LineFilterTransform(jing_overlay[:, :, 3], 10, 15, 20)
 ##
@@ -119,7 +99,7 @@ fig
 ##
 fig = Figure(resolution = (1000, 700))
 ax1 = fig[1, 1] = GLMakie.Axis(fig, title = "Actin (Equalized)")
-img1 = image!(ax1, actin_adj[z_ind, :, :])
+img1 = image!(ax1, actin[z_ind, :, :])
 ax2 = fig[2, 1] = GLMakie.Axis(fig, title = "Actin (LFT intensity)")
 img2 = image!(ax2, Images.scaleminmax(0, maximum(actin_I)).(actin_I))
 ax3 = fig[2, 2] = GLMakie.Axis(fig, title = "Actin (LFT orientation)")
@@ -130,7 +110,7 @@ fig
 ##
 fig = Figure(resolution = (1000, 700))
 ax1 = fig[1, 1] = GLMakie.Axis(fig, title = "Desmin (Equalized)")
-img1 = image!(ax1, desmin_adj[z_ind, :, :])
+img1 = image!(ax1, desmin[z_ind, :, :])
 ax2 = fig[2, 1] = GLMakie.Axis(fig, title = "Desmin (LFT intensity)")
 img2 = image!(ax2, Images.scaleminmax(0, maximum(desmin_I)).(desmin_I))
 ax3 = fig[2, 2] = GLMakie.Axis(fig, title = "Desmin (LFT orientation)")
@@ -141,7 +121,7 @@ fig
 ##
 fig = Figure(resolution = (800, 700))
 ax1 = fig[1, 1] = GLMakie.Axis(fig, title = "Overlay (Equalized)")
-img1 = image!(ax1, Images.colorview(Images.RGB, desmin_adj, actin_adj, Images.zeroarray)[z_ind, :, :])
+img1 = image!(ax1, Images.colorview(Images.RGB, desmin, actin, Images.zeroarray)[z_ind, :, :])
 ax2 = fig[2, 1] = GLMakie.Axis(fig, title = "Actin (LFT intensity)")
 img2 = image!(ax2, Images.colorview(Images.RGB, Images.scaleminmax(0, maximum(desmin_I)).(desmin_I), Images.scaleminmax(0, maximum(actin_I)).(actin_I), Images.zeroarray))
 fig
@@ -150,24 +130,25 @@ import ImageBinarization: binarize, Otsu
 lft_bin = binarize(desmin_I, Otsu())
 image(lft_bin)
 ##
-size(actin_adj)
+size(actin)
 ##
+analysis_region = (1:100, 1:200, 1:200)
 fig = Figure(resolution = (1500, 1000))
 ax1 = fig[1, 1] = Axis3(fig, title = "Actin 3D stack")
 ax2 = fig[1, 2] = Axis3(fig, title = "Desmin 3D stack")
-volume!(ax1, actin_adj[1:100, 1:100, 1:100], algorithm = :mip, colormap = :Greens_9, transparancy = true)
-volume!(ax2, desmin_adj[1:100, 1:100, 1:100], algorithm = :mip, colormap = :Reds_9, transparancy = true)
+volume!(ax1, actin[analysis_region...], algorithm = :mip, colormap = :Greens_9, transparancy = true)
+volume!(ax2, desmin[analysis_region...], algorithm = :mip, colormap = :Reds_9, transparancy = true)
 fig
 ##
-actin3dI, actin3dθ = LineFilterTransform(actin_adj[1:100, 1:100, 1:100], 10, 5, 10)
+actin3dI, actin3dθ = LineFilterTransform(actin[analysis_region...], 10, 5, 10)
 ##
-desmin3dI, desmin3dθ = LineFilterTransform(desmin_adj[1:100, 1:100, 1:100], 10, 5, 10)
+desmin3dI, desmin3dθ = LineFilterTransform(desmin[analysis_region...], 10, 5, 10)
 ##
 fig = Figure(resolution = (1000, 700))
 ax1 = fig[1, 1] = Axis3(fig, title = "Actin LFT intensity")
 ax2 = fig[1, 2] = Axis3(fig, title = "Desmin LFT intensity")
-volume!(ax1, Images.scaleminmax(Images.otsu_threshold(actin3dI), maximum(actin3dI)).(actin3dI), algorithm = :mip, colormap = :Greens_9, transparancy = true)
-volume!(ax2, Images.scaleminmax(Images.otsu_threshold(desmin3dI), maximum(desmin3dI)).(desmin3dI), algorithm = :mip, colormap = :Reds_9, transparancy = true)
+volume!(ax1, Images.scaleminmax(0, maximum(actin3dI)).(actin3dI), algorithm = :mip, colormap = :Greens_9, transparancy = true)
+volume!(ax2, Images.scaleminmax(0, maximum(desmin3dI)).(desmin3dI), algorithm = :mip, colormap = :Reds_9, transparancy = true)
 fig
 ##
 desmin3doft = OrientationFilterTransform(desmin3dI, desmin3dθ, 10, 5, 10)
